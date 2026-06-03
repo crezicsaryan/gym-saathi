@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, db } from '../utils/firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, getDoc, setDoc, getDocs, query, where, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -13,11 +13,19 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Chatbot States (Aeistha)
+  // ==========================================
+  // 🔥 UPGRADED AEISTHA CHATBOT STATES 🔥
+  // ==========================================
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef(null);
   const [chatMessages, setChatMessages] = useState([
-    { sender: 'ai', text: 'Hi! I am Aeistha, your AI Assistant. How can I help you manage your gym today?' }
+    { 
+      sender: 'ai', 
+      text: '👋 Namaste! Main Aeistha hoon, aapki Smart Gym Business Assistant.\n\nMain aapko help kar sakti hoon:\n• Revenue Analysis 📊\n• Client Management 👥\n• Due Payment Tracking ⚠️\n• Gym Growth Suggestions 🚀\n\nAaj aap kya jaana chahenge?',
+      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    }
   ]);
 
   // Setup / Settings Form
@@ -37,7 +45,7 @@ export default function Dashboard() {
   const [paymentScreenshot, setPaymentScreenshot] = useState('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
-  // 🔥 ADMIN GLOBAL SETTINGS (QR, UPI, Telegram, Email) 🔥
+  // ADMIN GLOBAL SETTINGS (QR, UPI, Telegram, Email)
   const [adminSettings, setAdminSettings] = useState({
     upiId: 'admin@upi', 
     qrCodeUrl: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg',
@@ -82,29 +90,41 @@ export default function Dashboard() {
   const daysLeft = gymProfile ? calculateDaysLeft(gymProfile.subscriptionEndDate) : 0;
   const isSubscriptionLocked = gymProfile && daysLeft <= 0 && gymProfile.subscriptionStatus !== 'pending_verification';
 
-  // VOICE AI LOGIC (Aeistha Speaks)
+  // ==========================================
+  // 🔥 UPGRADED VOICE AI LOGIC 🔥
+  // ==========================================
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Clean emojis and special characters for smooth voice reading
+      const cleanText = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|•|👋|📊|👥|⚠️|📈|💪|📌|🚀]/gu, '').trim();
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       const voices = window.speechSynthesis.getVoices();
       const femaleVoice = voices.find(voice => 
-        voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Zira') || voice.name.includes('Google UK English Female')
+        voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Zira') || voice.name.includes('Google UK English Female') || voice.name.includes('Microsoft Zira')
       );
       if (femaleVoice) utterance.voice = femaleVoice;
-      utterance.rate = 1;
-      utterance.pitch = 1.2;
+      utterance.rate = 1.05; // Slightly faster for natural feel
+      utterance.pitch = 1.1; // Premium AI pitch
       window.speechSynthesis.speak(utterance);
     }
   };
 
+  // Stop speaking immediately if chatbot is closed
   useEffect(() => {
-    if (isChatOpen && chatMessages.length === 1) {
-      speakText(chatMessages[0].text);
-    } else if (!isChatOpen) {
+    if (!isChatOpen) {
       window.speechSynthesis.cancel();
     }
-  }, [isChatOpen, chatMessages]);
+  }, [isChatOpen]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isTyping, isChatOpen]);
+
 
   // 3. MANUAL PAYMENT SUBMIT LOGIC
   const handleScreenshotUpload = (e) => {
@@ -225,23 +245,56 @@ export default function Dashboard() {
   const totalRevenue = clients.reduce((sum, c) => sum + (c.fee || 0), 0);
   const monthlyRevenue = clients.reduce((sum, c) => c.status !== 'Due' ? sum + (c.fee || 0) : sum, 0);
 
-  // AI CHATBOT LOGIC
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const userText = chatInput;
-    setChatMessages(prev => [...prev, { sender: 'user', text: userText }]);
+  // ==========================================
+  // 🔥 UPGRADED AI CHATBOT LOGIC 🔥
+  // ==========================================
+  const handleSendMessage = (e, quickActionText = null) => {
+    if (e) e.preventDefault();
+    
+    const userText = quickActionText || chatInput;
+    if (!userText.trim()) return;
+
+    const currentTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    
+    // 1. Add User Message
+    setChatMessages(prev => [...prev, { sender: 'user', text: userText, time: currentTime }]);
     setChatInput('');
+    
+    // 2. Start Typing Animation
+    setIsTyping(true);
+
+    // 3. Generate Smart Reply (Delayed naturally)
     setTimeout(() => {
-      let aiReply = `At ${gymProfile.gymName}, I am ready to assist you.`;
-      if(userText.toLowerCase().includes("due")) aiReply = `At ${gymProfile.gymName}, you currently have ${dueClientsCount} clients with pending payments.`;
-      else if (userText.toLowerCase().includes("revenue")) aiReply = `At ${gymProfile.gymName}, your total collected revenue is ₹${totalRevenue}.`;
-      else if (userText.toLowerCase().includes("client")) aiReply = `At ${gymProfile.gymName}, you are managing ${clients.length} clients.`;
-      else aiReply = `At ${gymProfile.gymName}, I'm here to help. Ask me about your dues, revenue, or clients!`;
-      setChatMessages(prev => [...prev, { sender: 'ai', text: aiReply }]);
+      let aiReply = '';
+      const lowerText = userText.toLowerCase();
+
+      if (lowerText.includes("due") || lowerText.includes("payment")) {
+        aiReply = `📌 Aapke gym mein filhaal ${dueClientsCount} members ki payment due hai.\n\nUnhe turant reminder bhejna accha rahega. Kya main aapko ek WhatsApp reminder message ka template du?`;
+      } 
+      else if (lowerText.includes("revenue") || lowerText.includes("report")) {
+        aiReply = `📊 Aapka total collected revenue ₹${totalRevenue} hai. Aur is mahine ka projection ₹${monthlyRevenue} hai.\n\nKya aap janna chahenge ki revenue ko 20% kaise badhaya jaye?`;
+      } 
+      else if (lowerText.includes("client") || lowerText.includes("member")) {
+        aiReply = `👥 Aapke paas total ${clients.length} active clients hain. Inme se ${upcomingCount} clients ka plan jaldi expire hone wala hai.\n\nKya main aapko renewal strategies bataun?`;
+      } 
+      else if (lowerText.includes("growth") || lowerText.includes("tips") || lowerText.includes("idea") || lowerText.includes("marketing")) {
+        aiReply = `🚀 Gym growth ke liye 'Refer-a-Friend' program sabse best hai! Aap apne existing members ko free 1-week extension de sakte hain agar wo naya member layein.\n\nKya main aapko aur festival offer recommendations share karun?`;
+      } 
+      else if (lowerText.includes("yes") || lowerText.includes("haan") || lowerText.includes("y")) {
+        aiReply = `💡 Great! Aap apne clients ko yeh offer bhej sakte hain:\n"Special Offer! Aaj hi apni membership renew karein aur payein 10% Extra Discount!"\n\nAap isey sidha clients ko WhatsApp kar sakte hain. Aur kuch janna chahenge?`;
+      }
+      else {
+        aiReply = `Main aapki gym management assistant hoon. Aap clients, revenue, memberships ya growth strategies ke baare mein kuch bhi pooch sakte hain.\n\nMain kaise help karun?`;
+      }
+
+      const aiTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      setChatMessages(prev => [...prev, { sender: 'ai', text: aiReply, time: aiTime }]);
+      setIsTyping(false);
       speakText(aiReply);
-    }, 1000);
+    }, 1500); // 1.5 seconds delay for natural AI feel
   };
+
 
   if (loading) return <div className="preloader-bg-white"><div className="brand-circle-wrapper"><div className="circle-spinner"></div><div className="brand-text"><span className="text-gym">GYM</span><span className="text-saathi">Saathi</span></div></div></div>;
 
@@ -296,7 +349,7 @@ export default function Dashboard() {
     );
   }
 
-  // IF SUBSCRIPTION EXPIRED (PAYWALL WITH DYNAMIC UPI & SUPPORT)
+  // IF SUBSCRIPTION EXPIRED
   if (isSubscriptionLocked) {
     return (
       <div className="paywall-container">
@@ -356,7 +409,6 @@ export default function Dashboard() {
         <div className={`nav-item ${activeTab === 'clients' ? 'active' : ''}`} onClick={() => {setActiveTab('clients'); setIsSidebarOpen(false);}}><i className="ri-team-fill"></i> Clients</div>
         <div className={`nav-item ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => {setActiveTab('payments'); setIsSidebarOpen(false);}}><i className="ri-secure-payment-line"></i> Payments</div>
         
-        {/* 🔥 NEW CUSTOMER SUPPORT TAB 🔥 */}
         <div className={`nav-item ${activeTab === 'support' ? 'active' : ''}`} onClick={() => {setActiveTab('support'); setIsSidebarOpen(false);}} style={{marginTop: 'auto', marginBottom: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px'}}>
           <i className="ri-customer-service-2-fill"></i> Help & Support
         </div>
@@ -507,7 +559,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 🔥 NEW SUPPORT TAB 🔥 */}
+        {/* SUPPORT TAB */}
         {activeTab === 'support' && (
           <div className="card" style={{ width: '100%', maxWidth: '600px', margin: '0 auto', textAlign: 'center', padding: '40px 20px' }}>
             <i className="ri-customer-service-2-fill" style={{fontSize: '60px', color: '#4318ff'}}></i>
@@ -552,7 +604,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* MODAL 1: ADD/EDIT CLIENT */}
+      {/* MODALS REMAIN UNCHANGED */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -589,7 +641,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MODAL 2: SETTINGS */}
       {isSettingsOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -611,15 +662,93 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* AEISTHA CHATBOT UI */}
-      <button className="chatbot-toggle" onClick={() => setIsChatOpen(!isChatOpen)}>🤖</button>
+      {/* ========================================== */}
+      {/* 🔥 UPGRADED PREMIUM AI CHATBOT UI 🔥 */}
+      {/* ========================================== */}
+      <button className="chatbot-toggle" onClick={() => setIsChatOpen(!isChatOpen)}>
+        <i className="ri-robot-2-fill" style={{ fontSize: '24px' }}></i>
+      </button>
+      
       {isChatOpen && (
-        <div className="chatbot-window">
-          <div className="chat-header"><span>✨ Aeistha</span><button onClick={() => setIsChatOpen(false)} style={{background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px'}}>✖</button></div>
-          <div className="chat-body">{chatMessages.map((msg, i) => (<div key={i} className={`chat-msg ${msg.sender === 'user' ? 'msg-user' : 'msg-ai'}`}>{msg.text}</div>))}</div>
-          <form className="chat-input-area" onSubmit={handleSendMessage}>
-            <input type="text" className="chat-input" placeholder="Ask Aeistha..." value={chatInput} onChange={e => setChatInput(e.target.value)} />
-            <button type="submit" className="chat-send">➤</button>
+        <div className="chatbot-window" style={{ display: 'flex', flexDirection: 'column', height: '500px', maxHeight: '80vh', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}>
+          
+          {/* ChatGPT Style Header */}
+          <div className="chat-header" style={{ background: '#4318ff', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.2)', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>✨</div>
+              <div>
+                <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>Aeistha AI</div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)' }}>Smart Business Assistant</div>
+              </div>
+            </div>
+            <button onClick={() => setIsChatOpen(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '22px' }}>✖</button>
+          </div>
+
+          {/* WhatsApp Style Chat Body */}
+          <div className="chat-body" style={{ flex: 1, background: '#f4f7fe', padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {chatMessages.map((msg, i) => (
+              <div key={i} style={{ alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                <div style={{ 
+                  background: msg.sender === 'user' ? '#4318ff' : 'white', 
+                  color: msg.sender === 'user' ? 'white' : '#2b3674', 
+                  padding: '12px 16px', 
+                  borderRadius: msg.sender === 'user' ? '16px 16px 0 16px' : '16px 16px 16px 0', 
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.05)', 
+                  fontSize: '14px', 
+                  lineHeight: '1.6', 
+                  whiteSpace: 'pre-line' 
+                }}>
+                  {msg.text}
+                </div>
+                <div style={{ fontSize: '11px', color: '#8f9bba', marginTop: '6px', textAlign: msg.sender === 'user' ? 'right' : 'left', padding: '0 4px' }}>
+                  {msg.time}
+                </div>
+              </div>
+            ))}
+            
+            {/* Typing Animation Indicator */}
+            {isTyping && (
+              <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+                <div style={{ background: 'white', color: '#8f9bba', padding: '12px 18px', borderRadius: '16px 16px 16px 0', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', fontSize: '14px', fontStyle: 'italic' }}>
+                  Aeistha is typing...
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Suggested Quick Action Chips */}
+          <div style={{ background: 'white', padding: '12px', display: 'flex', gap: '8px', overflowX: 'auto', borderTop: '1px solid #e2e8f0' }} className="hide-scrollbar">
+            {["📊 Revenue Report", "👥 Total Clients", "⚠️ Due Payments", "📈 Growth Tips", "💪 Marketing Ideas"].map((chip, index) => (
+              <button 
+                key={index} 
+                onClick={() => handleSendMessage(null, chip)} 
+                disabled={isTyping}
+                style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', padding: '8px 12px', borderRadius: '20px', fontSize: '12px', cursor: isTyping ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+
+          {/* Input Area */}
+          <form className="chat-input-area" onSubmit={(e) => handleSendMessage(e)} style={{ background: 'white', padding: '10px 15px', display: 'flex', gap: '10px', alignItems: 'center', borderTop: '1px solid #e2e8f0' }}>
+            <input 
+              type="text" 
+              className="chat-input" 
+              placeholder="Ask Aeistha..." 
+              value={chatInput} 
+              onChange={e => setChatInput(e.target.value)} 
+              disabled={isTyping}
+              style={{ flex: 1, background: '#f4f7fe', border: 'none', padding: '12px 15px', borderRadius: '24px', outline: 'none', color: '#2b3674' }} 
+            />
+            <button 
+              type="submit" 
+              disabled={isTyping || !chatInput.trim()} 
+              style={{ background: (!isTyping && chatInput.trim()) ? '#4318ff' : '#cbd5e1', color: 'white', border: 'none', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (!isTyping && chatInput.trim()) ? 'pointer' : 'not-allowed', transition: '0.3s' }}
+            >
+              <i className="ri-send-plane-fill" style={{ fontSize: '18px' }}></i>
+            </button>
           </form>
         </div>
       )}
