@@ -96,8 +96,8 @@ export default function Dashboard() {
   const speakText = (text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      // Clean emojis and special characters for smooth voice reading
-      const cleanText = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|•|👋|📊|👥|⚠️|📈|💪|📌|🚀]/gu, '').trim();
+      // FIX: Clean emojis and special characters for smooth voice reading without regex error
+      const cleanText = text.replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}•👋📊👥⚠️📈💪📌🚀💡]/gu, '').trim();
       
       const utterance = new SpeechSynthesisUtterance(cleanText);
       const voices = window.speechSynthesis.getVoices();
@@ -156,6 +156,13 @@ export default function Dashboard() {
   // 4. Setup First-Time Profile with 1 MONTH FREE TRIAL
   const saveProfile = async (e) => {
     e.preventDefault();
+    
+    // FIX: Compulsory 10 Digit Phone Number Check
+    if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+      alert("Please enter exactly 10 digits for the Mobile Number.");
+      return;
+    }
+
     const user = auth.currentUser;
     if (!user) return;
     const trialEnd = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -184,6 +191,13 @@ export default function Dashboard() {
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
+
+    // FIX: Compulsory 10 Digit Phone Number Check for Settings Edit
+    if (settingsForm.phone.length !== 10 || !/^\d{10}$/.test(settingsForm.phone)) {
+      alert("Please enter exactly 10 digits for the Phone Number.");
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'gym_owners', auth.currentUser.uid), settingsForm);
       setGymProfile({ ...gymProfile, ...settingsForm });
