@@ -618,16 +618,16 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* MODALS REMAIN UNCHANGED */}
+      {/* MODAL 1: ADD/EDIT CLIENT */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{marginBottom: '20px', color: '#2b3674'}}>{editingClientId ? 'Edit Client Details' : 'Add New Client'}</h2>
+            <h2 style={{marginBottom: '20px', color: '#2b3674'}}>{editingClientId ? 'Edit Client Details' : 'Add Client (New / Existing)'}</h2>
             <form onSubmit={handleAddOrUpdateClient}>
               <div className="input-group"><label>Full Name</label><input type="text" required value={newClient.name} onChange={e=>setNewClient({...newClient, name: e.target.value})} className="input-field" /></div>
               <div className="input-group"><label>Phone Number</label><input type="tel" required value={newClient.phone} onChange={e=>setNewClient({...newClient, phone: e.target.value})} className="input-field" /></div>
               <div style={{display: 'flex', gap: '15px', marginBottom: '15px'}}>
-                <div style={{flex: 1}}><label>Join Date</label><input type="date" required value={newClient.joinDate} onChange={e=>setNewClient({...newClient, joinDate: e.target.value})} className="input-field" /></div>
+                <div style={{flex: 1}}><label>Join Date (Past or Today)</label><input type="date" required value={newClient.joinDate} onChange={e=>setNewClient({...newClient, joinDate: e.target.value})} className="input-field" /></div>
                 <div style={{flex: 1}}><label>Total Fee (₹)</label><input type="number" required value={newClient.fee} onChange={e=>setNewClient({...newClient, fee: e.target.value})} className="input-field" /></div>
               </div>
               <div style={{display: 'flex', gap: '15px', marginBottom: '15px'}}>
@@ -637,14 +637,13 @@ export default function Dashboard() {
                     <option>1 Month</option><option>3 Months</option><option>6 Months</option><option>1 Year</option>
                   </select>
                 </div>
-                {editingClientId && (
-                  <div style={{flex: 1}}>
-                    <label>Update Status</label>
-                    <select className="input-field" value={newClient.status} onChange={e=>setNewClient({...newClient, status: e.target.value})}>
-                      <option>Active</option><option>Upcoming</option><option>Due</option>
-                    </select>
-                  </div>
-                )}
+                {/* 🔄 CHANGED: Removed the editingClientId condition. Status is now always visible. */}
+                <div style={{flex: 1}}>
+                  <label>Current Status</label>
+                  <select className="input-field" value={newClient.status} onChange={e=>setNewClient({...newClient, status: e.target.value})}>
+                    <option>Active</option><option>Upcoming</option><option>Due</option>
+                  </select>
+                </div>
               </div>
               <div style={{display: 'flex', gap: '10px', marginTop: '25px'}}>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="input-field" style={{flex: 1, background: '#f8fafc', cursor: 'pointer', border: 'none'}}>Cancel</button>
@@ -655,6 +654,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* MODAL 2: SETTINGS */}
       {isSettingsOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
